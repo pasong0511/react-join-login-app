@@ -1,8 +1,10 @@
 const express = require("express");
 const app = express();
 const port = 5000;
-
 const bodyParser = require("body-parser");
+
+const config = require("./config/key");
+
 const { User } = require("./models/User");
 
 //클라이언트에서 오는 정보를 서버에서 분석해서 가져온다.
@@ -37,13 +39,10 @@ app.post("/register", (req, res) => {
 //3. 몽구스 연결
 const mongoose = require("mongoose");
 mongoose
-    .connect(
-        "mongodb+srv://root:root@react-login-app.gu6tt.mongodb.net/?retryWrites=true&w=majority",
-        {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        }
-    )
+    .connect(config.mongoURI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+    })
     .then(() => console.log("MongoDB Connectec..."))
     .catch((err) => console.log(err));
 
