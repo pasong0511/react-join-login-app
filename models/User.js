@@ -32,6 +32,6 @@ const userSchema = mongoose.Schema({
     },
 });
 
-const Uesr = mongoose.model("User", userSchema);
+const User = mongoose.model("User", userSchema); //모델로 스키마를 감쌓준다
 
-module.exports = { Uesr };
+module.exports = { User }; //외부에서 사용할 수 있도록 내보내줌
