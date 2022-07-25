@@ -1,89 +1,107 @@
 //index.js
 const express = require("express");
 const app = express();
-const port = 5000;
+//client 에서 보내는 정보를 분석해서 서버에서 받을 수 있게 해준다.
+//bodyParser를 사용하지 않으면 req.body가 undefinded를 default로 받는다.
 const bodyParser = require("body-parser");
+//모델을 가져온다.
 const cookieParser = require("cookie-parser");
-
 const config = require("./config/key");
-
+const { auth } = require("./middleware/auth");
 const { User } = require("./models/User");
-
-//클라이언트에서 오는 정보를 서버에서 분석해서 가져온다.
-//application/x-www-form-urlencoded를 분석해서 가져온다.
+//application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: true }));
-//application/json을 분석해서 가져온다.
+//application/json
 app.use(bodyParser.json());
-//cookie 파서 사용
+/*bodyparser는 client 에서 오는 정보를 "분석해서" 가져올 수 있게 한다.
+x-www-form-urlencoded 이렇게 된 데이터와
+json 형식의 데이터를 분석할 수 있게 하기 위해 윗 문장을 적어준다.*/
 app.use(cookieParser());
 
-//1.
-app.get("/", (req, res) => {
-    res.send("Hello World! 반갑습니다");
+const mongoose = require("mongoose");
+//스키마를 만들고, 해당 스키마에 맞는 모델을 만들어 공통된 조건에 맞게 조회 및 저장이 가능하다.
+mongoose
+    .connect(config.mongoURI) //서버와 데이터베이스(mongoDB)를 연결
+    .then(() => console.log("MongoDB Connected..."))
+    .catch((err) => console.log("MongoDB error: ", err));
+
+app.get("/", (req, res) => res.send("hello world"));
+
+app.get("/api/hello", (req, res) => {
+    res.send("Hello World~ ");
 });
 
-//2.
-//회원가입 할때 필요한 정보들을 client에서 가져오면
-//그것들을 데이터베이스에 넣어준다.
 app.post("/api/users/register", (req, res) => {
-    //인스턴스 생성
-    //req.body안에는 json 형태로 {id:"hello", password:"132"} 이러한 형태로 들어가있음 -> body-parser가 있어서 가능
+    //받은 정보로 모델 생성, json 형식으로 req가 들어있다.
     const user = new User(req.body);
 
-    user.save((err, userInfo) => {
+    user.save((err, doc) => {
         if (err) return res.json({ success: false, err });
-        return res.status(200).json({
-            //status가 200일 경우 return 값
-            success: true,
-            userInfo,
-        });
-    }); //몽고DB에서 사용하는 메소드, user안에 있는 값이 DB로 저장
+        return res.status(200).json({ success: true });
+    });
+    //결과적으로 http post 메소드로 백엔드 서버로 유저 정보를 날려주고
+    //백엔드 서버에서 save 메소드로 DB에 저장을 해준다
 });
 
-//4.
 app.post("/api/users/login", (req, res) => {
-    //4-1요청된 이메일을 데이터베이스에 있는지 찾는다.
+    //요청된 이메일을 데이터베이스에서 찾는다. mongoDB 메서드 이용
     User.findOne({ email: req.body.email }, (err, user) => {
-        //user 없는 경우
+        //요청한 email이 db정보 안에 있을 때 해당 db정보를 담은 객체 user 가 생성된다.
         if (!user) {
             return res.json({
                 loginSuccess: false,
                 message: "제공된 이메일에 해당하는 유저가 없습니다.",
             });
         }
-
-        //4-2요청된 이메일이 데이터베이스에 있다면 비밀번호가 맞는 비밀번호인지 확인한다.
-        //body 값에 저장되어있는 req.body.password
+        //요청된 이메일이 데이터 베이스에 있다면 비밀번호가 맞는 비밀번호 인지 확인
         user.comparePassword(req.body.password, (err, isMatch) => {
-            //isMatch : db에 있는 pwd와 입력한 pwd가 일치
             if (!isMatch)
-                //비밀번호가 틀렸을 경우
+                //비밀번호가 틀림
                 return res.json({
                     loginSuccess: false,
-                    message: "비밀번호가 틀렸습니다.",
+                    message: "비밀번호가 틀렸습니다",
                 });
-            //4-3비밀번호까지 같다면 Token을 생성한다.
-            //User.js의 generateToken()를 불러옴
-            //user안에는 토큰이 들어가있을 것이다.
+            //비밀번호가 맞다면 그 유저를 위한 토큰 생성
             user.generateToken((err, user) => {
+                //token이 들어있는 user 객체
                 if (err) return res.status(400).send(err);
-                //token을 원하는 곳(쿠키, 로컬스토리지 등. 여기서는 쿠키에 저장)에 저장한다.
+
+                //토큰을 저장한다. 어디에? 쿠키, localStorage 등.. 지금은 쿠키에
                 res.cookie("x_auth", user.token)
-                    .status(200)
+                    .status(200) //성공했다는 표시
                     .json({ loginSuccess: true, userId: user._id });
             });
         });
     });
 });
 
-//3. 몽구스 연결
-const mongoose = require("mongoose");
-mongoose
-    .connect(config.mongoURI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-    })
-    .then(() => console.log("MongoDB Connectec..."))
-    .catch((err) => console.log(err));
+//현재의 role => role 0 -> 일반유저, role 0 아니면 관리자
+app.get("/api/users/auth", auth /*미들웨어*/, (req, res) => {
+    //여기 까지 미들웨어를 통과해 왔다는 얘기는 authentication 이 true 라는 말
+    res.status(200).json({
+        _id: req.user._id, //auth에서 user 를 req 에 넣었기 때문에 사용가능
+        isAdmin: req.user.role === 0 ? false : true, //변경가능
+        isAuth: true,
+        email: req.user.email,
+        name: req.user.name,
+        lastname: req.user.lastname,
+        role: req.user.role,
+        image: req.user.image,
+    });
+});
 
-app.listen(port, () => console.log(`${port}포트입니다.`));
+app.get("/api/users/logout", auth, (req, res) => {
+    //첫번째 인자에 찾을 조건, 두번재 인자에 변경할 것
+    User.findOneAndUpdate(
+        { _id: req.user._id /*auth에서 req에 넣어줌*/ },
+        { token: "" },
+        (err, user) => {
+            if (err) return res.json({ success: false, err });
+            return res.status(200).send({ success: true });
+        }
+    );
+});
+
+const port = 5000;
+//5000번 포트에서 연결을 청취하고, 연결됬을 시 콜백함수를 실행한다.
+app.listen(port, () => console.log(`Example app listening on port ${port}!`));
