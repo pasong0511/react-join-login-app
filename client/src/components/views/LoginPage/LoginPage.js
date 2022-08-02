@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import Axios from "axios";
 
 //리덕스 사용
 import { useDispatch } from "react-redux";

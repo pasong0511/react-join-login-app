@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import { LOGIN_USER } from "./types";
+import { LOGIN_USER, REGISTER_USER } from "./types";
 
 //이메일과 패스워드 넣어준것을 파라미터로 받는다.
 //axios 작업을 여기와서 한다.
@@ -15,6 +15,17 @@ export function loginUser(dataToSubmit) {
     //리퀘스트를 페이로드에 넣어준다.
     return {
         type: LOGIN_USER,
+        payload: request,
+    };
+}
+
+export function registerUser(dataToSubmit) {
+    const request = axios
+        .post("/api/users/register", dataToSubmit)
+        .then((response) => response.data);
+
+    return {
+        type: REGISTER_USER,
         payload: request,
     };
 }
